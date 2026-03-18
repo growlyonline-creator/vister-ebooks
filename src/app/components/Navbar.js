@@ -1,10 +1,10 @@
 "use client";
 
-import { Search, ShoppingCart, User, Menu, X, ChevronDown, LogOut, LayoutDashboard, Settings, Zap, Crown, BookOpen } from 'lucide-react';
+import { Search, ShoppingCart, User, Menu, X, ChevronDown, LogOut, LayoutDashboard, Settings, Zap, Crown, BookOpen, TrendingUp } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { auth, googleProvider, db } from '../lib/firebase'; // db को यहाँ जोड़ा गया है
+import { auth, googleProvider, db } from '../lib/firebase';
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore'; // firestore फंक्शन्स
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -24,28 +24,22 @@ export default function Navbar() {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             if (currentUser) {
                 setUser(currentUser);
-
                 try {
-                    // यूजर का डेटाबेस (Firestore) चेक करें
                     const userRef = doc(db, "users", currentUser.uid);
                     const userSnap = await getDoc(userRef);
-
-                    // अगर यूजर पहली बार आया है (डेटाबेस में नहीं है), तो उसका रिकॉर्ड बनाएँ
                     if (!userSnap.exists()) {
                         await setDoc(userRef, {
                             name: currentUser.displayName,
                             email: currentUser.email,
                             photo: currentUser.photoURL,
-                            isVIP: false, // शुरुआत में VIP नहीं होगा
+                            isVIP: false,
                             vipExpiry: null,
                             createdAt: new Date().getTime()
                         });
-                        console.log("New User Profile Created in Firestore!");
                     }
                 } catch (error) {
                     console.error("Firestore User Sync Error:", error);
                 }
-
             } else {
                 setUser(null);
             }
@@ -72,16 +66,16 @@ export default function Navbar() {
     return (
         <header className="w-full shadow-md sticky top-0 z-[100]">
             {/* --- Upper Navbar --- */}
-            <nav className="bg-slate-900 text-white p-2 md:p-3 shadow-lg">
+            <nav className="bg-slate-900 text-white p-2 md:p-3 shadow-lg font-sans">
                 <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 md:gap-6">
 
-                    <button className="md:hidden p-1 hover:bg-slate-800 rounded" onClick={() => setIsMenuOpen(true)}>
+                    <button className="md:hidden p-1 hover:bg-slate-800 rounded transition-colors" onClick={() => setIsMenuOpen(true)}>
                         <Menu size={28} />
                     </button>
 
                     {/* Logo Section */}
                     <Link href="/" className="flex flex-col items-start leading-none group">
-                        <span className="text-xl md:text-2xl font-bold text-white tracking-tighter group-hover:text-orange-500 transition-colors uppercase">
+                        <span className="text-xl md:text-2xl font-bold text-white tracking-tighter group-hover:text-orange-500 transition-colors uppercase italic">
                             Vister<span className="text-orange-500 group-hover:text-white">.in</span>
                         </span>
                         <span className="hidden md:block text-[10px] text-orange-400 font-black uppercase tracking-widest text-center w-full">E-Books</span>
@@ -118,38 +112,47 @@ export default function Navbar() {
 
                         {user ? (
                             <div className="group relative flex flex-col items-start cursor-pointer p-1 rounded hover:outline outline-1 outline-white transition-all">
-                                <span className="text-[10px] leading-none text-gray-400 font-bold italic">Hi, {user.displayName?.split(' ')[0]}</span>
+                                <span className="text-[10px] leading-none text-gray-400 font-bold italic font-sans truncate max-w-[60px]">Hi, {user.displayName?.split(' ')[0]}</span>
                                 <div className="flex items-center gap-1">
-                                    <img src={user.photoURL} className="w-6 h-6 rounded-full border border-orange-500" alt="profile" />
+                                    <img src={user.photoURL} className="w-6 h-6 rounded-full border border-orange-500 shadow-sm" alt="profile" />
                                     <span className="text-sm font-black hidden sm:block">Account</span>
                                     <ChevronDown size={14} className="text-gray-500" />
                                 </div>
-                                <div className="absolute top-full right-0 hidden group-hover:block bg-white text-black p-2 shadow-[0_10px_40px_rgba(0,0,0,0.2)] rounded border min-w-[200px] mt-1 animate-in fade-in zoom-in duration-150">
-                                    <div className="p-2 border-b mb-1 uppercase text-[9px] font-black text-gray-400 tracking-widest">User Dashboard</div>
+
+                                {/* --- Desktop Dropdown Menu --- */}
+                                <div className="absolute top-full right-0 hidden group-hover:block bg-white text-black p-2 shadow-[0_10px_40px_rgba(0,0,0,0.2)] rounded border min-w-[210px] mt-1 animate-in fade-in zoom-in duration-150">
+                                    <div className="p-2 border-b mb-1 uppercase text-[9px] font-black text-gray-400 tracking-widest">Dashboard</div>
+
                                     <Link href="/my-library" className="flex items-center gap-2 p-2 hover:bg-orange-50 text-slate-700 font-bold text-sm rounded mb-1 transition-colors">
                                         <BookOpen size={16} className="text-orange-500" /> My Library
                                     </Link>
+
+                                    {/* --- Admin Features --- */}
                                     {user.email === "ceovistertech@gmail.com" && (
                                         <>
                                             <div className="border-t my-1"></div>
+                                            {/* कमाई का डैशबोर्ड यहाँ है */}
+                                            <Link href="/admin/dashboard" className="flex items-center gap-2 p-2 hover:bg-green-50 text-green-600 font-bold text-sm rounded mb-1 border-b">
+                                                <TrendingUp size={16} /> Sales Dashboard
+                                            </Link>
                                             <Link href="/admin/upload" className="flex items-center gap-2 p-2 hover:bg-slate-100 text-orange-600 font-black text-sm rounded">
-                                                <LayoutDashboard size={16} /> Upload Book
+                                                <LayoutDashboard size={16} /> Upload New Book
                                             </Link>
                                             <Link href="/admin/manage" className="flex items-center gap-2 p-2 hover:bg-slate-100 text-blue-600 font-black text-sm rounded">
-                                                <Settings size={16} /> Manage All
+                                                <Settings size={16} /> Manage All Books
                                             </Link>
                                         </>
                                     )}
                                     <div className="border-t my-1"></div>
                                     <button onClick={handleLogout} className="flex items-center gap-2 p-2 hover:bg-red-50 text-red-600 w-full text-sm font-black transition-colors rounded">
-                                        <LogOut size={16} /> Log Out
+                                        <LogOut size={16} /> Log Out Account
                                     </button>
                                 </div>
                             </div>
                         ) : (
                             <div onClick={handleLogin} className="flex flex-col items-start cursor-pointer p-1 rounded hover:outline outline-1 outline-white transition-all">
-                                <span className="text-[10px] leading-none text-gray-400 font-bold">Hello, Guest</span>
-                                <span className="text-sm font-black flex items-center">Sign In <ChevronDown size={14} className="text-gray-500" /></span>
+                                <span className="text-[10px] leading-none text-gray-400 font-bold tracking-tighter">Hello, Sign In</span>
+                                <span className="text-sm font-black flex items-center">Account <ChevronDown size={14} className="text-gray-500" /></span>
                             </div>
                         )}
 
@@ -194,11 +197,11 @@ export default function Navbar() {
                 </Link>
             </div>
 
-            {/* --- Mobile Sidebar --- */}
+            {/* --- Mobile Sidebar (Drawer) --- */}
             {isMenuOpen && (
                 <>
                     <div className="fixed inset-0 bg-black/80 z-[200] backdrop-blur-sm" onClick={() => setIsMenuOpen(false)}></div>
-                    <div className="fixed top-0 left-0 h-full w-[85%] max-w-[300px] bg-white z-[201] shadow-2xl overflow-y-auto transition-all animate-in slide-in-from-left duration-300 font-sans">
+                    <div className="fixed top-0 left-0 h-full w-[85%] max-w-[300px] bg-white z-[201] shadow-2xl overflow-y-auto transition-all animate-in slide-in-from-left duration-300">
                         <div className="bg-slate-900 text-white p-5 flex items-center justify-between shadow-lg">
                             <div className="flex items-center gap-3">
                                 {user ? (
@@ -209,7 +212,7 @@ export default function Navbar() {
                                 ) : (
                                     <div className="flex items-center gap-2 cursor-pointer" onClick={handleLogin}>
                                         <div className="bg-slate-700 p-2 rounded-full"><User size={24} /></div>
-                                        <span className="text-lg font-black uppercase">Login</span>
+                                        <span className="text-lg font-black uppercase tracking-tighter">Login</span>
                                     </div>
                                 )}
                             </div>
@@ -217,17 +220,11 @@ export default function Navbar() {
                         </div>
 
                         <div className="p-5">
-                            <Link href="/vip-membership" onClick={() => setIsMenuOpen(false)} className="flex items-center justify-center gap-2 bg-gradient-to-r from-yellow-400 to-orange-500 p-4 rounded-xl text-slate-900 font-black mb-8 shadow-xl active:scale-95 uppercase tracking-widest text-sm">
+                            <Link href="/vip-membership" onClick={() => setIsMenuOpen(false)} className="flex items-center justify-center gap-2 bg-gradient-to-r from-yellow-400 to-orange-500 p-4 rounded-xl text-slate-900 font-black mb-8 shadow-xl active:scale-95 transition-all uppercase tracking-widest text-sm">
                                 <Crown size={20} /> Activate VIP PASS
                             </Link>
 
-                            {user && (
-                                <Link href="/my-library" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-3 p-4 bg-orange-50 text-orange-600 rounded-xl font-black mb-8 border border-orange-100 shadow-sm">
-                                    <BookOpen size={20} /> My Digital Library
-                                </Link>
-                            )}
-
-                            <h3 className="text-[10px] font-black mb-4 border-b pb-2 text-slate-400 uppercase tracking-widest">Trending Categories</h3>
+                            <h3 className="text-[10px] font-black mb-4 border-b pb-2 text-slate-400 uppercase tracking-[0.2em]">Trending</h3>
                             <ul className="space-y-1">
                                 {categories.map((cat, index) => (
                                     <li key={index}>
@@ -242,21 +239,25 @@ export default function Navbar() {
                                 ))}
                             </ul>
 
+                            {/* Mobile Admin Section */}
                             <div className="mt-10 pt-5 border-t border-gray-100">
                                 {user?.email === "ceovistertech@gmail.com" && (
                                     <>
-                                        <p className="text-[9px] font-black text-gray-400 uppercase mb-4 tracking-widest italic">Management Portal</p>
+                                        <p className="text-[9px] font-black text-gray-400 uppercase mb-4 tracking-widest italic">CEO Management</p>
+                                        <Link href="/admin/dashboard" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-3 text-green-600 font-black mb-6 px-3 uppercase text-xs">
+                                            <TrendingUp size={20} /> Earnings Dashboard
+                                        </Link>
                                         <Link href="/admin/upload" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-3 text-orange-600 font-black mb-6 px-3 uppercase text-xs">
                                             <LayoutDashboard size={20} /> Upload Panel
                                         </Link>
                                         <Link href="/admin/manage" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-3 text-blue-600 font-black mb-8 px-3 uppercase text-xs">
-                                            <Settings size={20} /> Library Sync
+                                            <Settings size={20} /> Library Settings
                                         </Link>
                                     </>
                                 )}
                                 {user && (
-                                    <button onClick={handleLogout} className="flex items-center gap-3 text-red-600 font-black px-3 w-full text-left pt-5 border-t border-red-50 hover:bg-red-50 py-3 rounded-xl transition-all uppercase text-xs">
-                                        <LogOut size={20} /> Log Out Account
+                                    <button onClick={handleLogout} className="flex items-center gap-3 text-red-600 font-black px-3 w-full text-left pt-5 border-t border-red-50 hover:bg-red-50 py-3 rounded-xl transition-all uppercase text-xs tracking-tighter">
+                                        <LogOut size={20} /> Logout Vister Account
                                     </button>
                                 )}
                             </div>

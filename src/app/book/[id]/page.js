@@ -11,10 +11,10 @@ export default function BookDetail() {
     const { id } = useParams();
     const [book, setBook] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [isPaid, setIsPaid] = useState(false); // सिर्फ इस बुक के लिए पेमेंट स्टेटस
+    const [isPaid, setIsPaid] = useState(false); // इस बुक के लिए पेमेंट स्टेटस
     const [isVIP, setIsVIP] = useState(false);   // यूजर का VIP स्टेटस
 
-    // 1. डेटाबेस से बुक की जानकारी और यूजर का VIP स्टेटस चेक करना
+    // 1. डेटाबेस से बुक और यूजर का VIP स्टेटस चेक करना
     useEffect(() => {
         const fetchInitialData = async () => {
             try {
@@ -45,7 +45,7 @@ export default function BookDetail() {
         fetchInitialData();
     }, [id, auth.currentUser]);
 
-    // 2. सुरक्षित डाउनलोड फंक्शन
+    // 2. पक्का डाउनलोड फंक्शन
     const triggerDownload = () => {
         if (!book) return;
         const link = document.createElement("a");
@@ -57,7 +57,7 @@ export default function BookDetail() {
         document.body.removeChild(link);
     };
 
-    // 3. असली पेमेंट लॉजिक (LIVE Mode)
+    // 3. पेमेंट लॉजिक (LIVE Mode + Dashboard Data Sync)
     const handlePayment = async () => {
         if (!auth.currentUser) return alert("कृपया पहले लॉगिन (Login) करें!");
 
@@ -72,7 +72,7 @@ export default function BookDetail() {
 
             if (!order.id) throw new Error("Order creation failed");
 
-            // Razorpay ऑप्शंस - यहाँ आपकी LIVE ID डली है
+            // Razorpay ऑप्शंस
             const options = {
                 key: "rzp_live_SSZ0OP8zl6nSzK", // आपकी असली लाइव आईडी
                 amount: order.amount,
@@ -83,19 +83,21 @@ export default function BookDetail() {
                 handler: async function (response) {
                     setIsPaid(true);
 
-                    // --- 1 साल की वैलिडिटी सेट करना ---
+                    // 1 साल बाद की एक्सपायरी डेट
                     const oneYearLater = new Date();
                     oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
                     const expiryTime = oneYearLater.getTime();
 
                     try {
-                        // डेटाबेस में 'purchases' रिकॉर्ड सेव करना
+                        // --- डैशबोर्ड और लाइब्रेरी के लिए डेटाबेस में खरीद का रिकॉर्ड डालें ---
                         await addDoc(collection(db, "purchases"), {
                             userId: auth.currentUser.uid,
+                            userName: auth.currentUser.displayName || "Student", // छात्र का नाम
                             bookId: id,
                             bookTitle: book.title,
                             bookImage: book.image,
                             bookPdfUrl: book.pdfUrl,
+                            amount: Number(book.price), // कमाई डैशबोर्ड के लिए कीमत
                             purchaseDate: serverTimestamp(),
                             expiryTime: expiryTime, // 1 साल की वैलिडिटी
                             paymentId: response.razorpay_payment_id
@@ -104,7 +106,8 @@ export default function BookDetail() {
                         alert("पेमेंट सफल! यह किताब 1 साल के लिए आपकी लाइब्रेरी में जोड़ दी गई है।");
                         triggerDownload(); // तुरंत डाउनलोड शुरू करें
                     } catch (err) {
-                        console.error("Database Error:", err);
+                        console.error("Database Save Error:", err);
+                        alert("पेमेंट सफल रहा, लेकिन रिकॉर्ड सेव करने में दिक्कत हुई।");
                     }
                 },
                 prefill: {
@@ -122,8 +125,8 @@ export default function BookDetail() {
         }
     };
 
-    if (loading) return <div className="p-20 text-center font-bold text-slate-500 animate-pulse uppercase tracking-[0.3em]">Syncing Vister Library...</div>;
-    if (!book) return <div className="p-20 text-center font-bold text-red-500">Book not found!</div>;
+    if (loading) return <div className="p-20 text-center font-bold text-slate-500 animate-pulse uppercase tracking-widest">Opening Vister Library...</div>;
+    if (!book) return <div className="p-20 text-center font-bold text-red-500 uppercase">Book not found!</div>;
 
     return (
         <main className="min-h-screen bg-white pb-20 font-sans">
@@ -132,13 +135,8 @@ export default function BookDetail() {
 
             <div className="max-w-7xl mx-auto p-5 md:p-10 grid md:grid-cols-2 gap-10 md:gap-16">
                 {/* बायाँ हिस्सा: बुक इमेज */}
-                <div className="bg-slate-50 p-5 md:p-12 rounded-[2.5rem] flex justify-center border border-slate-100 shadow-inner group relative">
-                    <img
-                        src={book.image}
-                        className="max-h-[550px] shadow-[0_20px_50px_rgba(0,0,0,0.2)] rounded-lg group-hover:scale-[1.03] transition-transform duration-500 z-10"
-                        alt={book.title}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-tr from-orange-500/5 to-transparent rounded-[2.5rem]"></div>
+                <div className="bg-slate-50 p-5 md:p-12 rounded-[2.5rem] flex justify-center border border-slate-100 shadow-inner group">
+                    <img src={book.image} className="max-h-[550px] shadow-[0_20px_50px_rgba(0,0,0,0.15)] rounded-lg group-hover:scale-[1.03] transition-transform duration-500" alt={book.title} />
                 </div>
 
                 {/* दायाँ हिस्सा: बुक डिटेल्स */}
@@ -148,35 +146,32 @@ export default function BookDetail() {
                             <span className="bg-orange-100 text-orange-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
                                 {book.category}
                             </span>
-                            {book.pages && (
-                                <span className="bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
-                                    📄 {book.pages} Pages
-                                </span>
-                            )}
+                            <span className="bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
+                                📄 {book.pages || '0'} Pages
+                            </span>
                         </div>
-                        <h1 className="text-3xl md:text-5xl font-black text-slate-900 leading-[1.1] tracking-tighter">
+                        <h1 className="text-3xl md:text-5xl font-black text-slate-900 leading-tight tracking-tighter">
                             {book.title}
                         </h1>
                         <div className="flex items-center gap-3 mt-4">
                             <div className="flex text-yellow-500">
                                 {[...Array(5)].map((_, i) => <Star key={i} size={18} fill="currentColor" />)}
                             </div>
-                            <span className="text-sm font-bold text-slate-400 uppercase tracking-widest border-l pl-3">Verified Original</span>
+                            <span className="text-sm font-bold text-slate-400 uppercase tracking-widest border-l pl-3 italic">Verified Study Material</span>
                         </div>
                     </div>
 
-                    <div className="bg-slate-50 p-8 rounded-[2rem] border border-slate-100">
+                    <div className="bg-slate-50 p-8 rounded-[2rem] border border-slate-100 shadow-sm">
                         <div className="flex items-baseline gap-4 mb-4">
                             <span className="text-5xl font-black text-slate-900 tracking-tighter">₹{book.price}</span>
-                            <span className="text-gray-400 line-through text-xl font-medium">M.R.P: ₹{book.oldPrice}</span>
-                            <span className="text-green-600 font-black text-sm uppercase">({Math.round(((book.oldPrice - book.price) / book.oldPrice) * 100)}% OFF)</span>
+                            <span className="text-gray-400 line-through text-xl font-medium tracking-tight">M.R.P: ₹{book.oldPrice}</span>
                         </div>
                         <div className="space-y-3">
                             <p className="text-green-700 font-bold text-sm flex items-center gap-2 bg-green-100/50 w-fit px-3 py-1.5 rounded-lg border border-green-200">
-                                <Zap size={16} fill="currentColor" /> Instant Digital PDF Access
+                                <Zap size={16} fill="currentColor" /> Instant Digital PDF Download
                             </p>
                             <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
-                                <CheckCircle size={14} className="text-orange-500" /> 1 Year Validity in My Library
+                                <CheckCircle size={14} className="text-orange-500" /> 1 Year Accessibility in Library
                             </p>
                         </div>
                     </div>
@@ -186,14 +181,14 @@ export default function BookDetail() {
                         {isVIP || isPaid ? (
                             <button
                                 onClick={triggerDownload}
-                                className="w-full bg-green-600 hover:bg-green-700 text-white py-6 rounded-3xl font-black text-xl shadow-2xl shadow-green-100 flex items-center justify-center gap-4 animate-in zoom-in duration-300 transition-all active:scale-95"
+                                className="w-full bg-green-600 hover:bg-green-700 text-white py-6 rounded-3xl font-black text-xl shadow-2xl shadow-green-100 flex items-center justify-center gap-4 transition-all active:scale-95"
                             >
-                                <Download size={28} /> {isVIP ? "DOWNLOAD (VIP ACCESS)" : "DOWNLOAD PDF NOW"}
+                                <Download size={28} /> {isVIP ? "DOWNLOAD (VIP PASS ACCESS)" : "DOWNLOAD PDF NOW"}
                             </button>
                         ) : (
                             <button
                                 onClick={handlePayment}
-                                className="w-full bg-orange-500 hover:bg-orange-600 text-white py-6 rounded-3xl font-black text-xl shadow-2xl shadow-orange-100 transition-all active:scale-95 flex items-center justify-center gap-4 uppercase tracking-widest"
+                                className="w-full bg-orange-500 hover:bg-orange-600 text-white py-6 rounded-3xl font-black text-xl shadow-2xl shadow-orange-100 transition-all active:scale-95 flex items-center justify-center gap-4 uppercase tracking-tighter"
                             >
                                 <Zap size={24} fill="currentColor" /> Buy Now & Download
                             </button>
@@ -203,7 +198,7 @@ export default function BookDetail() {
                             <div className="mt-6 p-4 bg-orange-50 rounded-2xl border border-orange-100 flex items-center justify-center gap-3">
                                 {isVIP ? <Crown size={20} className="text-orange-600 animate-pulse" /> : <CheckCircle size={20} className="text-green-600" />}
                                 <p className="text-[10px] font-black text-slate-800 uppercase tracking-widest">
-                                    {isVIP ? "Premium VIP Benefits Active" : "Payment Successfully Verified"}
+                                    {isVIP ? "Premium VIP Member Benefits Active" : "Order Successfully Verified"}
                                 </p>
                             </div>
                         )}
@@ -211,13 +206,13 @@ export default function BookDetail() {
 
                     {/* ट्रस्ट सेक्शन */}
                     <div className="grid grid-cols-2 gap-4">
-                        <div className="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center text-center group hover:border-orange-200 transition-colors">
-                            <ShieldCheck className="text-blue-600 mb-2 group-hover:scale-110 transition-transform" size={32} />
-                            <p className="text-[10px] font-black text-slate-900 uppercase tracking-tighter">100% Secure Payment</p>
+                        <div className="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center text-center">
+                            <ShieldCheck className="text-blue-600 mb-2" size={32} />
+                            <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest tracking-tighter">100% Secure Payment</p>
                         </div>
-                        <div className="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center text-center group hover:border-orange-200 transition-colors">
-                            <Zap className="text-orange-500 mb-2 group-hover:scale-110 transition-transform" size={32} />
-                            <p className="text-[10px] font-black text-slate-900 uppercase tracking-tighter">Lifetime Customer Support</p>
+                        <div className="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center text-center">
+                            <Zap className="text-orange-500 mb-2" size={32} />
+                            <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest tracking-tighter">Instant PDF Access</p>
                         </div>
                     </div>
                 </div>
