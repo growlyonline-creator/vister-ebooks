@@ -2,36 +2,32 @@
 import { useEffect, useState } from 'react';
 import { db, auth } from '../../lib/firebase';
 import { collection, query, getDocs, orderBy } from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
-import { IndianRupee, ShoppingBag, Users, TrendingUp, Calendar, Lock, Loader2 } from 'lucide-react';
+import { IndianRupee, ShoppingBag, Users, TrendingUp, Calendar, Lock, Loader2, LogOut } from 'lucide-react';
 
 export default function AdminDashboard() {
     const [sales, setSales] = useState([]);
     const [stats, setStats] = useState({ totalRevenue: 0, todayRevenue: 0, totalOrders: 0, todayOrders: 0 });
     const [loading, setLoading] = useState(true);
-    const [userEmail, setUserEmail] = useState(null);
-    const [isAuthorized, setIsAuthorized] = useState(false);
+    const [user, setUser] = useState(null);
 
     const ADMIN_EMAIL = "ceovistertech@gmail.com";
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            if (user) {
-                const email = user.email.toLowerCase().trim();
-                setUserEmail(email);
-
-                if (email === ADMIN_EMAIL.toLowerCase().trim()) {
-                    setIsAuthorized(true);
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+            if (currentUser) {
+                console.log("Logged in as:", currentUser.email);
+                setUser(currentUser);
+                // बिलकुल सटीक मैच चेक करें
+                if (currentUser.email.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase().trim()) {
                     fetchSalesData();
                 } else {
-                    setIsAuthorized(false);
                     setLoading(false);
                 }
             } else {
-                setUserEmail(null);
-                setIsAuthorized(false);
+                setUser(null);
                 setLoading(false);
             }
         });
@@ -61,44 +57,41 @@ export default function AdminDashboard() {
             setStats({ totalRevenue: totalRev, todayRevenue: todayRev, totalOrders: salesData.length, todayOrders: todayOrd });
             setSales(salesData);
         } catch (error) {
-            console.error("Sales Fetch Error:", error);
+            console.error("Fetch Error:", error);
         }
         setLoading(false);
     };
 
-    // 1. सबसे पहले लोडिंग स्क्रीन (जब तक पक्का न हो जाए)
-    if (loading) {
-        return (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white">
-                <Loader2 className="animate-spin text-orange-500 mb-4" size={50} />
-                <p className="text-sm font-black uppercase tracking-[0.4em] animate-pulse">Vister Security Check...</p>
-            </div>
-        );
-    }
+    if (loading) return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white font-sans">
+            <Loader2 className="animate-spin text-orange-500 mb-4" size={50} />
+            <p className="text-sm font-black uppercase tracking-[0.4em]">Verifying Vister CEO...</p>
+        </div>
+    );
 
-    // 2. अगर ईमेल गलत है
-    if (!isAuthorized) {
+    if (!user || user.email.toLowerCase().trim() !== ADMIN_EMAIL.toLowerCase().trim()) {
         return (
-            <main className="min-h-screen bg-white flex flex-col font-sans">
+            <main className="min-h-screen bg-gray-50 flex flex-col font-sans">
                 <Navbar />
                 <div className="flex-grow flex flex-col items-center justify-center p-10 text-center">
-                    <div className="bg-red-50 p-8 rounded-full mb-6 border-4 border-red-100">
-                        <Lock size={80} className="text-red-500" />
+                    <div className="bg-white p-10 rounded-[3rem] shadow-2xl border-4 border-red-100 max-w-lg">
+                        <Lock size={80} className="text-red-500 mx-auto mb-6" />
+                        <h2 className="text-3xl font-black text-slate-900 mb-2 uppercase italic">Admin Access Denied</h2>
+                        <p className="text-slate-500 mb-8 font-medium">आप अभी <span className="text-red-600 font-bold">{user?.email || "Guest"}</span> से लॉगिन हैं। डैशबोर्ड देखने के लिए CEO ईमेल का उपयोग करें।</p>
+
+                        <button
+                            onClick={() => signOut(auth).then(() => window.location.reload())}
+                            className="flex items-center justify-center gap-2 bg-slate-900 text-white w-full py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-orange-500 transition-all"
+                        >
+                            <LogOut size={20} /> Logout and Fix
+                        </button>
                     </div>
-                    <h2 className="text-4xl font-black text-slate-900 mb-2 uppercase tracking-tighter italic">Access Denied</h2>
-                    <p className="text-slate-500 max-w-sm font-medium">This dashboard is reserved for Vister CEO only.</p>
-                    <div className="mt-8 p-4 bg-slate-100 rounded-2xl border">
-                        <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Your Logged Email:</p>
-                        <p className="text-sm font-bold text-slate-700">{userEmail || "Not Logged In"}</p>
-                    </div>
-                    <p className="text-xs text-orange-500 mt-4 font-bold">Please login with {ADMIN_EMAIL}</p>
                 </div>
                 <Footer />
             </main>
         );
     }
 
-    // 3. असली डैशबोर्ड (जब ईमेल मैच हो जाए)
     return (
         <main className="min-h-screen bg-slate-50 flex flex-col font-sans italic">
             <Navbar />
@@ -109,57 +102,57 @@ export default function AdminDashboard() {
                     </h1>
                 </div>
 
+                {/* डैशबोर्ड का बाकी हिस्सा वही रहेगा... */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
-                    <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
+                    <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 italic">
                         <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-1">Today's Profit</p>
                         <h2 className="text-4xl font-black text-slate-900 tracking-tighter">₹{stats.todayRevenue}</h2>
                     </div>
-                    <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
-                        <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-1">Orders</p>
-                        <h2 className="text-4xl font-black text-slate-900 tracking-tighter">{stats.todayOrders}</h2>
+                    <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 italic">
+                        <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-1 italic">Total Orders</p>
+                        <h2 className="text-4xl font-black text-slate-900 tracking-tighter italic">{stats.totalOrders}</h2>
                     </div>
-                    <div className="bg-slate-900 p-6 rounded-[2rem] shadow-2xl text-white">
-                        <p className="text-orange-400 text-[10px] font-black uppercase tracking-[0.2em] mb-1">Total Sales</p>
+                    <div className="bg-slate-900 p-6 rounded-[2rem] shadow-2xl text-white italic">
+                        <p className="text-orange-400 text-[10px] font-black uppercase tracking-[0.2em] mb-1 italic">Lifetime Sales</p>
                         <h2 className="text-4xl font-black tracking-tighter">₹{stats.totalRevenue}</h2>
                     </div>
-                    <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
-                        <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-1">Students</p>
-                        <h2 className="text-4xl font-black text-slate-900 tracking-tighter">{stats.totalOrders}</h2>
+                    <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 italic">
+                        <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-1 italic">Students</p>
+                        <h2 className="text-4xl font-black text-slate-900 tracking-tighter italic">{stats.totalOrders}</h2>
                     </div>
                 </div>
 
                 <div className="bg-white rounded-[2.5rem] shadow-xl border overflow-hidden">
-                    <div className="p-8 border-b bg-slate-50 flex items-center justify-between">
+                    <div className="p-8 border-b bg-slate-50 flex items-center justify-between italic">
                         <h3 className="font-black text-slate-800 uppercase text-xs tracking-[0.2em]">Transaction History</h3>
                         <Calendar size={20} className="text-slate-400" />
                     </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                            <thead className="bg-slate-50 border-b">
+                    <div className="overflow-x-auto italic">
+                        <table className="w-full text-left font-sans italic">
+                            <thead>
                                 <tr className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
                                     <th className="p-6">Buyer Name</th>
                                     <th className="p-6">E-Book Title</th>
-                                    <th className="p-6">Amount</th>
-                                    <th className="p-6">Date</th>
+                                    <th className="p-5">Amount</th>
+                                    <th className="p-5">Date</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-50">
+                            <tbody className="divide-y divide-gray-50 italic font-sans">
                                 {sales.map((sale) => (
-                                    <tr key={sale.id} className="hover:bg-slate-50 transition-all font-medium">
+                                    <tr key={sale.id} className="hover:bg-slate-50 transition-all font-sans italic">
                                         <td className="p-6">
                                             <p className="font-black text-slate-900">{sale.userName}</p>
                                             <p className="text-[9px] text-gray-400">{sale.email}</p>
                                         </td>
                                         <td className="p-6 text-sm text-slate-600">{sale.bookTitle}</td>
                                         <td className="p-6 font-black text-green-600 text-lg">₹{sale.amount}</td>
-                                        <td className="p-6 text-xs text-gray-500">
+                                        <td className="p-6 text-xs text-gray-500 font-sans italic">
                                             {sale.purchaseDate?.toDate().toLocaleString()}
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
-                        {sales.length === 0 && <p className="text-center p-20 text-slate-300 font-black uppercase">No Sales Yet</p>}
                     </div>
                 </div>
             </div>

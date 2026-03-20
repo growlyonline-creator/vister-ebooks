@@ -1,6 +1,6 @@
 import "./globals.css";
 
-// 1. आपका पूरा मेटाडेटा (SEO + Icon + Branding)
+// 1. आपका पूरा मेटाडेटा (SEO + Icon + Branding + Verification)
 export const metadata = {
   metadataBase: new URL('https://ebooks.vister.in'), // सबडोमेन URL
   title: {
@@ -14,14 +14,19 @@ export const metadata = {
   ],
   authors: [{ name: "Vister Technologies" }],
 
-  // --- आपका नया Shield Logo यहाँ सेट किया गया है ---
-  icons: {
-    icon: '/logo.png',       // यह ब्राउज़र के टैब (Tab) में दिखेगा
-    shortcut: '/logo.png',
-    apple: '/logo.png',      // मोबाइल पर शॉर्टकट बनाने पर दिखेगा
+  // --- GOOGLE SEARCH CONSOLE VERIFICATION ADDED HERE ---
+  verification: {
+    google: "8CK4uhkP_0wSDvthCOswoxm5ePnBhZl61wF6-Krla5c",
   },
 
-  // सोशल मीडिया (WhatsApp/FB) पर लिंक शेयर करने के लिए
+  // --- आपका Shield Logo यहाँ सेट है ---
+  icons: {
+    icon: '/logo.png',       // यह ब्राउज़र के टैब में दिखेगा
+    shortcut: '/logo.png',
+    apple: '/logo.png',      // मोबाइल पर दिखेगा
+  },
+
+  // सोशल मीडिया (WhatsApp/FB) शेयरिंग के लिए
   openGraph: {
     title: "Vister Technologies | Premium PDF & Ebook Store",
     description: "Access 10,000+ Ebooks and Study Material across all categories.",
@@ -31,7 +36,7 @@ export const metadata = {
     type: 'website',
     images: [
       {
-        url: '/logo.png', // शेयर करने पर यही लोगो दिखेगा
+        url: '/logo.png',
         width: 800,
         height: 600,
         alt: 'Vister Technologies Logo',
@@ -49,10 +54,6 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <head>
-        {/* यह पक्का करता है कि टैब में लोगो दिखे */}
-        <link rel="icon" href="/logo.png" />
-      </head>
       <body className="antialiased font-sans selection:bg-orange-500 selection:text-white">
         {children}
 
