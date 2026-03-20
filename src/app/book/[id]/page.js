@@ -44,6 +44,7 @@ export default async function BookDetailPage({ params }) {
         image: data.image || "",
         pdfUrl: data.pdfUrl || "",
         pages: data.pages || "0",
+        description: data.description || "",
         rating: data.rating || 5,
         // समय (Timestamp) को स्ट्रिंग में बदल रहे हैं ताकि एरर न आए
         createdAt: data.createdAt ? data.createdAt.toDate().toISOString() : null
