@@ -1,4 +1,5 @@
 import "./globals.css";
+import AppDownloadPopup from './components/AppDownloadPopup';
 
 // 1. आपका पूरा मेटाडेटा (SEO + Icon + Branding + Verification)
 export const metadata = {
@@ -14,12 +15,12 @@ export const metadata = {
   ],
   authors: [{ name: "Vister Technologies" }],
 
-  // --- GOOGLE SEARCH CONSOLE VERIFICATION ADDED HERE ---
+  // --- GOOGLE SEARCH CONSOLE VERIFICATION ---
   verification: {
     google: "8CK4uhkP_0wSDvthCOswoxm5ePnBhZl61wF6-Krla5c",
   },
 
-  // --- आपका Shield Logo यहाँ सेट है ---
+  // --- आपका Shield Logo आइकन ---
   icons: {
     icon: '/logo.png',       // यह ब्राउज़र के टैब में दिखेगा
     shortcut: '/logo.png',
@@ -44,7 +45,7 @@ export const metadata = {
     ],
   },
 
-  // गूगल सर्च इंजन के लिए
+  // गूगल सर्च इंजन के लिए निर्देश
   robots: {
     index: true,
     follow: true,
@@ -56,6 +57,9 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body className="antialiased font-sans selection:bg-orange-500 selection:text-white">
         {children}
+
+        {/* ऐप डाउनलोड पॉपअप यहाँ रहेगा जो 3 सेकंड बाद दिखेगा */}
+        <AppDownloadPopup />
 
         {/* Google Schema Markup - इससे गूगल को पता चलता है कि यह एक 'Store' है */}
         <script
