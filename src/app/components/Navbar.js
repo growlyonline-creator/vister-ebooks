@@ -1,9 +1,9 @@
 "use client";
 
-import { Search, ShoppingCart, User, Menu, X, ChevronDown, LogOut, LayoutDashboard, Settings, Zap, Crown, BookOpen, TrendingUp } from 'lucide-react';
+import { Search, ShoppingCart, User, Menu, X, ChevronDown, LogOut, LayoutDashboard, Settings, Zap, Crown, BookOpen, TrendingUp, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { auth, googleProvider, db } from '../lib/firebase';
-import { signInWithPopup, signInWithRedirect, signOut, onAuthStateChanged } from 'firebase/auth';
+import { signInWithPopup, signInWithRedirect, signOut, onAuthStateChanged, getRedirectResult } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -12,6 +12,7 @@ export default function Navbar() {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [user, setUser] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
+    const [isLoggingIn, setIsLoggingIn] = useState(false);
     const router = useRouter();
 
     const categories = [
@@ -21,8 +22,21 @@ export default function Navbar() {
 
     const ADMIN_EMAIL = "ceovistertech@gmail.com";
 
-    // 1. लॉगिन स्टेटस मॉनिटर करना और डेटाबेस में प्रोफाइल बनाना
+    // --- 1. लॉगिन स्टेटस और रिडायरेक्ट रिजल्ट हैंडल करना (For App Fix) ---
     useEffect(() => {
+        // ऐप के अंदर लॉगिन होकर वापस आने पर डेटा संभालता है
+        const handleRedirectResult = async () => {
+            try {
+                const result = await getRedirectResult(auth);
+                if (result) {
+                    console.log("App Login Success via Redirect");
+                }
+            } catch (error) {
+                console.error("Redirect Login Error:", error.message);
+            }
+        };
+        handleRedirectResult();
+
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             if (currentUser) {
                 setUser(currentUser);
@@ -40,7 +54,7 @@ export default function Navbar() {
                         });
                     }
                 } catch (error) {
-                    console.error("Firestore Error:", error);
+                    console.error("Firestore User Sync Error:", error);
                 }
             } else {
                 setUser(null);
@@ -49,18 +63,35 @@ export default function Navbar() {
         return () => unsubscribe();
     }, []);
 
-    // 2. स्मार्ट लॉगिन फंक्शन (App में Redirect, Web में Popup)
+    // --- 2. सुधरा हुआ और सुरक्षित लॉगिन फंक्शन (Popup Closed Error Fix) ---
     const handleLogin = async () => {
+        if (isLoggingIn) return;
+        setIsLoggingIn(true);
+
         try {
-            const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+            // मोबाइल या ऐप चेक करने का तरीका
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
             if (isMobile) {
+                // मोबाइल ऐप के लिए Redirect (WebView Error Fix)
                 await signInWithRedirect(auth, googleProvider);
             } else {
+                // कंप्यूटर के लिए Popup
                 await signInWithPopup(auth, googleProvider);
             }
         } catch (error) {
-            console.error("Login Error:", error.message);
-            alert("लॉगिन में समस्या आ रही है। अगर आप ऐप में हैं, तो पक्का करें कि इंटरनेट चालू है।");
+            // --- एरर फिक्सिंग लॉजिक ---
+            if (error.code === 'auth/popup-closed-by-user') {
+                console.log("User closed the login popup voluntarily.");
+                // यहाँ अलर्ट नहीं दिखाएंगे क्योंकि यूजर ने खुद बंद किया है
+            } else if (error.code === 'auth/cancelled-popup-request') {
+                console.log("Multiple popup requests detected.");
+            } else {
+                console.error("Actual Login Error:", error.message);
+                alert("लॉगिन नहीं हो पाया। कृपया पक्का करें कि इंटरनेट चालू है।");
+            }
+        } finally {
+            setIsLoggingIn(false);
         }
     };
 
@@ -76,30 +107,31 @@ export default function Navbar() {
 
     return (
         <header className="w-full shadow-md sticky top-0 z-[100] font-sans">
-            {/* --- मुख्य नेवबार (Desktop & Tablet) --- */}
             <nav className="bg-slate-900 text-white p-2 md:p-3 shadow-lg">
                 <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 md:gap-6">
 
-                    {/* मोबाइल मेनू बटन */}
                     <button className="md:hidden p-1 hover:bg-slate-800 rounded transition-colors" onClick={() => setIsMenuOpen(true)}>
                         <Menu size={28} />
                     </button>
 
-                    {/* Vister Logo */}
-                    <Link href="/" className="flex flex-col items-start leading-none group cursor-pointer">
-                        <span className="text-xl md:text-2xl font-black text-white tracking-tighter group-hover:text-orange-500 transition-colors uppercase italic">
-                            Vister<span className="text-orange-500 group-hover:text-white">.in</span>
-                        </span>
-                        <span className="hidden md:block text-[10px] text-orange-400 font-black uppercase tracking-widest text-center w-full">E-Books</span>
+                    {/* Logo Section */}
+                    <Link href="/" className="flex items-center gap-2 group cursor-pointer">
+                        <img src="/logo.png" alt="Vister Logo" className="h-8 md:h-10 w-auto shadow-sm rounded-full bg-white p-0.5" />
+                        <div className="flex flex-col items-start leading-none">
+                            <span className="text-xl md:text-2xl font-black text-white tracking-tighter group-hover:text-orange-500 transition-colors uppercase italic">
+                                Vister<span className="text-orange-500 group-hover:text-white">.in</span>
+                            </span>
+                            <span className="hidden md:block text-[10px] text-orange-400 font-black uppercase tracking-widest text-center w-full">E-Books</span>
+                        </div>
                     </Link>
 
-                    {/* सर्च बार (Desktop) */}
-                    <form onSubmit={handleSearch} className="hidden md:flex flex-1 items-center bg-white rounded-md overflow-hidden ring-2 ring-transparent focus-within:ring-orange-500 mx-4 border-2 border-transparent transition-all">
+                    {/* Search Bar: Desktop */}
+                    <form onSubmit={handleSearch} className="hidden md:flex flex-1 items-center bg-white rounded-md overflow-hidden ring-2 ring-transparent focus-within:ring-orange-500 mx-4 border-2 border-transparent shadow-inner">
                         <div className="bg-gray-100 text-gray-700 px-3 py-2 text-[10px] font-black border-r cursor-default uppercase">All</div>
                         <input
                             type="text"
                             placeholder="Search 10,000+ Premium E-books..."
-                            className="w-full p-2 text-black outline-none px-4 text-sm font-medium"
+                            className="w-full p-2 text-black outline-none px-4 text-sm font-medium font-sans"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
@@ -108,14 +140,11 @@ export default function Navbar() {
                         </button>
                     </form>
 
-                    {/* दाएँ हाथ के बटन्स */}
                     <div className="flex items-center gap-2 md:gap-5">
-                        {/* VIP Pass */}
-                        <Link href="/vip-membership" className="hidden lg:flex items-center gap-1 bg-gradient-to-r from-yellow-400 to-orange-500 px-3 py-1.5 rounded-md text-slate-900 font-black text-[10px] animate-pulse shadow-lg hover:shadow-orange-500/20 transition-all">
+                        <Link href="/vip-membership" className="hidden lg:flex items-center gap-1 bg-gradient-to-r from-yellow-400 to-orange-500 px-3 py-1.5 rounded-md text-slate-900 font-black text-[10px] animate-pulse shadow-lg hover:shadow-orange-500/20">
                             <Crown size={14} /> VIP PASS
                         </Link>
 
-                        {/* My Library आइकन */}
                         {user && (
                             <Link href="/my-library" className="hidden sm:flex flex-col items-center justify-center p-1 rounded hover:outline outline-1 outline-white transition-all group">
                                 <BookOpen size={24} className="group-hover:text-orange-400 transition-colors" />
@@ -123,78 +152,65 @@ export default function Navbar() {
                             </Link>
                         )}
 
-                        {/* यूजर अकाउंट सेक्शन */}
                         {user ? (
                             <div className="group relative flex flex-col items-start cursor-pointer p-1 rounded hover:outline outline-1 outline-white transition-all">
                                 <span className="text-[10px] leading-none text-gray-400 font-bold italic truncate max-w-[60px]">Hi, {user.displayName?.split(' ')[0]}</span>
                                 <div className="flex items-center gap-1">
                                     <img src={user.photoURL} className="w-6 h-6 rounded-full border border-orange-500 shadow-sm" alt="user" />
-                                    <span className="text-sm font-black hidden sm:block">Account</span>
+                                    <span className="text-sm font-black hidden sm:block uppercase">Account</span>
                                     <ChevronDown size={14} className="text-gray-500" />
                                 </div>
-                                {/* डेस्कटॉप ड्रॉपडाउन */}
                                 <div className="absolute top-full right-0 hidden group-hover:block bg-white text-black p-2 shadow-[0_10px_40px_rgba(0,0,0,0.2)] rounded border min-w-[210px] mt-1 animate-in fade-in zoom-in duration-150">
                                     <div className="p-2 border-b mb-1 uppercase text-[9px] font-black text-gray-400 tracking-widest">Dashboard</div>
-                                    <Link href="/my-library" className="flex items-center gap-2 p-2 hover:bg-orange-50 text-slate-700 font-bold text-sm rounded mb-1 transition-colors">
+                                    <Link href="/my-library" className="flex items-center gap-2 p-2 hover:bg-orange-50 text-slate-700 font-bold text-sm rounded mb-1 transition-colors font-sans">
                                         <BookOpen size={16} className="text-orange-500" /> My Library
                                     </Link>
                                     {user.email === ADMIN_EMAIL && (
                                         <>
                                             <div className="border-t my-1"></div>
-                                            <Link href="/admin/dashboard" className="flex items-center gap-2 p-2 hover:bg-green-50 text-green-600 font-black text-sm rounded mb-1 border-b">
+                                            <Link href="/admin/dashboard" className="flex items-center gap-2 p-2 hover:bg-green-50 text-green-600 font-bold text-sm rounded mb-1 border-b">
                                                 <TrendingUp size={16} /> Sales Dashboard
                                             </Link>
                                             <Link href="/admin/upload" className="flex items-center gap-2 p-2 hover:bg-slate-100 text-orange-600 font-black text-sm rounded">
-                                                <LayoutDashboard size={16} /> Upload Book
+                                                <LayoutDashboard size={16} /> Upload New Book
                                             </Link>
                                             <Link href="/admin/manage" className="flex items-center gap-2 p-2 hover:bg-slate-100 text-blue-600 font-black text-sm rounded">
-                                                <Settings size={16} /> Manage Library
+                                                <Settings size={16} /> Manage All Books
                                             </Link>
                                         </>
                                     )}
                                     <div className="border-t my-1"></div>
                                     <button onClick={handleLogout} className="flex items-center gap-2 p-2 hover:bg-red-50 text-red-600 w-full text-sm font-black transition-colors rounded text-left">
-                                        <LogOut size={16} /> Log Out
+                                        <LogOut size={16} /> Log Out Account
                                     </button>
                                 </div>
                             </div>
                         ) : (
                             <div onClick={handleLogin} className="flex flex-col items-start cursor-pointer p-1 rounded hover:outline outline-1 outline-white transition-all active:scale-95">
-                                <span className="text-[10px] leading-none text-gray-400 font-bold tracking-tighter italic">Hello Student,</span>
-                                <span className="text-sm font-black flex items-center uppercase">Sign In <ChevronDown size={14} className="text-gray-500" /></span>
+                                {isLoggingIn ? <Loader2 className="animate-spin text-orange-500 mx-auto" /> : (
+                                    <>
+                                        <span className="text-[10px] leading-none text-gray-400 font-bold tracking-tighter italic">Student Portal</span>
+                                        <span className="text-sm font-black flex items-center uppercase tracking-tighter">Sign In <ChevronDown size={14} className="text-gray-500" /></span>
+                                    </>
+                                )}
                             </div>
                         )}
 
-                        {/* Cart / VIP Upgrade */}
                         <Link href="/vip-membership" className="relative flex items-center gap-1 cursor-pointer p-1 rounded hover:outline outline-1 outline-white transition-all group">
                             <div className="relative">
                                 <ShoppingCart size={28} />
                                 <span className="absolute -top-1 -right-1 bg-orange-500 text-slate-900 text-[9px] font-black rounded-full h-4 w-4 flex items-center justify-center italic">VIP</span>
                             </div>
-                            <div className="hidden sm:flex flex-col leading-none">
-                                <span className="text-[10px] text-gray-400 font-black uppercase">Plan</span>
-                                <span className="text-xs font-black group-hover:text-orange-400 transition-colors uppercase">Upgrade</span>
+                            <div className="hidden sm:flex flex-col leading-none text-white">
+                                <span className="text-[10px] text-gray-400 font-black uppercase tracking-tighter">Plan</span>
+                                <span className="text-xs font-black group-hover:text-orange-400 transition-colors uppercase tracking-tighter">Upgrade</span>
                             </div>
                         </Link>
                     </div>
                 </div>
-
-                {/* सर्च बार (Mobile Only) */}
-                <form onSubmit={handleSearch} className="md:hidden mt-2 flex bg-white rounded-md overflow-hidden shadow-inner ring-1 ring-slate-800">
-                    <input
-                        type="text"
-                        placeholder="Search books..."
-                        className="w-full p-2 text-sm text-black outline-none font-medium"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                    <button type="submit" className="bg-orange-500 p-2 px-4 active:bg-orange-600 transition-colors">
-                        <Search size={20} className="text-slate-900" />
-                    </button>
-                </form>
             </nav>
 
-            {/* --- कैटेगरी बार (Scrollable) --- */}
+            {/* --- Lower Category Bar --- */}
             <div className="bg-slate-800 text-white px-4 py-2 flex items-center gap-5 text-[10px] font-black uppercase tracking-widest overflow-x-auto no-scrollbar whitespace-nowrap shadow-inner border-t border-slate-700">
                 <button onClick={() => setIsMenuOpen(true)} className="flex items-center gap-1 hover:text-orange-400 transition-colors">
                     <Menu size={14} /> All Categories
@@ -204,12 +220,9 @@ export default function Navbar() {
                         {cat}
                     </Link>
                 ))}
-                <Link href="/search?q=best" className="ml-auto text-orange-400 flex items-center gap-1 animate-pulse hover:text-white transition-colors">
-                    <Zap size={12} fill="currentColor" /> Best Sellers
-                </Link>
             </div>
 
-            {/* --- मोबाइल साइडबार (Drawer) --- */}
+            {/* --- Mobile Sidebar --- */}
             {isMenuOpen && (
                 <>
                     <div className="fixed inset-0 bg-black/80 z-[200] backdrop-blur-sm" onClick={() => setIsMenuOpen(false)}></div>
@@ -224,26 +237,21 @@ export default function Navbar() {
                                 ) : (
                                     <div className="flex items-center gap-2 cursor-pointer" onClick={handleLogin}>
                                         <div className="bg-slate-700 p-2 rounded-full shadow-inner"><User size={24} /></div>
-                                        <span className="text-lg font-black uppercase tracking-tighter">Sign In</span>
+                                        <span className="text-lg font-black uppercase tracking-widest">Login</span>
                                     </div>
                                 )}
                             </div>
                             <button className="hover:bg-slate-700 p-1 rounded transition-colors" onClick={() => setIsMenuOpen(false)}><X size={28} /></button>
                         </div>
-
-                        <div className="p-5">
-                            {/* VIP CTA */}
-                            <Link href="/vip-membership" onClick={() => setIsMenuOpen(false)} className="flex items-center justify-center gap-2 bg-gradient-to-r from-yellow-400 to-orange-500 p-4 rounded-xl text-slate-900 font-black mb-6 shadow-xl active:scale-95 transition-all uppercase tracking-widest text-sm">
+                        <div className="p-5 font-sans italic">
+                            <Link href="/vip-membership" onClick={() => setIsMenuOpen(false)} className="flex items-center justify-center gap-2 bg-gradient-to-r from-yellow-400 to-orange-500 p-4 rounded-xl text-slate-900 font-black mb-8 shadow-xl active:scale-95 uppercase tracking-widest text-sm italic font-sans">
                                 <Crown size={20} /> Activate VIP PASS
                             </Link>
-
-                            {/* Library Link */}
                             {user && (
                                 <Link href="/my-library" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-3 p-4 bg-orange-50 text-orange-600 rounded-xl font-black mb-8 border border-orange-100 shadow-sm active:scale-95 transition-all">
                                     <BookOpen size={20} /> My Digital Library
                                 </Link>
                             )}
-
                             <h3 className="text-[10px] font-black mb-4 border-b pb-2 text-slate-400 uppercase tracking-widest">Trending Categories</h3>
                             <ul className="space-y-1">
                                 {categories.map((cat, index) => (
@@ -251,33 +259,31 @@ export default function Navbar() {
                                         <Link
                                             href={`/search?category=${encodeURIComponent(cat.split(' ')[0])}`}
                                             onClick={() => setIsMenuOpen(false)}
-                                            className="flex justify-between items-center py-4 px-3 hover:bg-slate-50 hover:text-orange-600 rounded-xl font-black text-xs text-slate-700 border-b border-gray-50 transition-all uppercase group"
+                                            className="flex justify-between items-center py-4 px-3 hover:bg-slate-50 hover:text-orange-600 rounded-xl font-black text-xs text-slate-700 border-b border-gray-50 transition-all uppercase"
                                         >
-                                            {cat} <ChevronDown size={14} className="-rotate-90 text-gray-300 group-hover:text-orange-500" />
+                                            {cat} <ChevronDown size={14} className="-rotate-90 text-gray-300" />
                                         </Link>
                                     </li>
                                 ))}
                             </ul>
-
-                            {/* एडमिन और लॉगआउट */}
-                            <div className="mt-10 pt-5 border-t border-gray-100">
+                            <div className="mt-10 pt-5 border-t border-gray-100 font-sans italic">
                                 {user?.email === ADMIN_EMAIL && (
                                     <>
-                                        <p className="text-[9px] font-black text-gray-400 uppercase mb-4 tracking-widest italic">CEO Portal</p>
-                                        <Link href="/admin/dashboard" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-3 text-green-600 font-black mb-6 px-3 uppercase text-xs hover:translate-x-1 transition-transform">
+                                        <p className="text-[9px] font-black text-gray-400 uppercase mb-4 tracking-widest italic">Management Portal</p>
+                                        <Link href="/admin/dashboard" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-3 text-green-600 font-black mb-6 px-3 uppercase text-xs hover:translate-x-1 transition-transform italic tracking-tighter">
                                             <TrendingUp size={20} /> Earning Dashboard
                                         </Link>
-                                        <Link href="/admin/upload" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-3 text-orange-600 font-black mb-6 px-3 uppercase text-xs hover:translate-x-1 transition-transform">
-                                            <LayoutDashboard size={20} /> Upload Book
+                                        <Link href="/admin/upload" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-3 text-orange-600 font-black mb-6 px-3 uppercase text-xs hover:translate-x-1 transition-transform italic tracking-tighter">
+                                            <LayoutDashboard size={20} /> Upload Panel
                                         </Link>
-                                        <Link href="/admin/manage" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-3 text-blue-600 font-black mb-8 px-3 uppercase text-xs hover:translate-x-1 transition-transform">
-                                            <Settings size={20} /> Manage Library
+                                        <Link href="/admin/manage" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-3 text-blue-600 font-black mb-8 px-3 uppercase text-xs hover:translate-x-1 transition-transform italic tracking-tighter">
+                                            <Settings size={20} /> Library Sync
                                         </Link>
                                     </>
                                 )}
                                 {user && (
-                                    <button onClick={handleLogout} className="flex items-center gap-3 text-red-600 font-black px-3 w-full text-left pt-5 border-t border-red-50 hover:bg-red-50 py-3 rounded-xl transition-all uppercase text-xs">
-                                        <LogOut size={20} /> Sign Out Account
+                                    <button onClick={handleLogout} className="flex items-center gap-3 text-red-600 font-black px-3 w-full text-left pt-5 border-t border-red-50 hover:bg-red-50 py-3 rounded-xl transition-all uppercase text-xs tracking-tighter italic">
+                                        <LogOut size={20} /> Sign Out Vister
                                     </button>
                                 )}
                             </div>
